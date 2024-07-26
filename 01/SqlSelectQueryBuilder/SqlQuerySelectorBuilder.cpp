@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
-
+#include <assert.h>
 
 struct SqlQuery {
 
@@ -15,43 +15,46 @@ struct SqlQuery {
 
 class SqlSelectQueryBuilder {
 public:
-    constexpr bool BuildQuery() {
-        return true;
-    }
 
-    const std::string makeQuery() {
-        std::string result = getSelect() + getFrom() + getWhere() + ";\n";
+    std::string makeQuery() {
+        std::string result = getSelect() + getFrom() + getWhere() + ";";
         return result;
     }
 
     const std::string getSelect() {
+        std::stringstream stream;
         std::string select;
-        std::stringstream queryStringStream;
         for (auto it = query.column.begin(); it != query.column.end(); it++) {
             if (it != query.column.begin()) {
-                queryStringStream << ", ";
+                stream << ", ";
             }
-            queryStringStream << *it;
+            stream << *it;
         }
-        if (query.column.empty() && !query.from.empty()) select = "SELECT * ";
-        else select = "SELECT " + queryStringStream.str() + " ";
+        if (query.column.empty()) {
+            select = "SELECT * ";
+        }
+        else select = "SELECT " + stream.str() + " ";
         return select;
     }
 
     const std::string getFrom() {
-        std::string from = "FROM " + query.from + " ";
+        std::string from;
+        if (!query.from.empty()) {
+            from = "FROM " + query.from + " ";
+        }
+        else from = "";
         return from;
     }
 
     const std::string getWhere() {
+        std::stringstream stream;
         std::string where;
-        std::stringstream queryStringStream;
         for (auto it = query.where.begin(); it != query.where.end(); it++) {
             if (it != query.where.begin()) {
-                queryStringStream << " AND ";
+                stream << " AND ";
             }
-            queryStringStream << it->first + "=" + it->second;
-            where = "WHERE " + queryStringStream.str();
+            stream << it->first + "=" + it->second;
+            where = "WHERE " + stream.str();
         }
         return where;
     }
@@ -81,24 +84,28 @@ public:
         return *this;
     }
 
+    ~SqlSelectQueryBuilder() = default;
+
 private:
     SqlQuery query;
 };
 
 int main(int argc, char** argv) {
+    //check empty query
     SqlSelectQueryBuilder query_builder;
-
+    auto query = query_builder.makeQuery();
+    std::cout << query_builder.makeQuery() << "\n";
+    assert(query_builder.makeQuery().find("SELECT *") == 0);
+    assert(query_builder.makeQuery().rfind(";") == (query.size() - 1));
+    //add data
     query_builder.AddColumn("name").AddColumn("phone");
     query_builder.AddWhere("id", "42").AddWhere("name", "John");
     query_builder.AddFrom("students");
     std::cout << query_builder.makeQuery() << "\n";
-    static_assert(query_builder.BuildQuery(),
-        "Error in making query");
-
+    assert(query_builder.makeQuery() == "SELECT name, phone FROM students WHERE id=42 AND name=John;");
     query_builder.AddColumns({ "age", "sex" });
     query_builder.AddWhere({ { "age", "20" }, { "sex", "male" } });
     std::cout << query_builder.makeQuery() << "\n";
-    static_assert(query_builder.BuildQuery(),
-        "SELECT name, phone FROM students WHERE age=20 AND sex=male;");
+    assert(query_builder.makeQuery() == "SELECT name, phone FROM students WHERE age=20 AND sex=male;");
     return 0;
 }
